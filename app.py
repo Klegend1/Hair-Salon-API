@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
+import datetime
+# from datetime import datetime, time
+
 
 
 # Initialize Flask
@@ -15,127 +18,13 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# # def get_db_connection():
-# #     connection = psycopg2.connect(
-# #         host='localhost',
-# #         database='hairsalon_db',
-# #         #user=os.environ['POSTGRES_USER'],
-# #         #password=os.environ['POSTGRES_PASSWORD']
-# #     )
-# #     return connection
-
-
-# # Route To View All Users
-# @app.route('/users')
-# def get_useres():
-#   try:
-#     connection = get_db_connection()
-#     cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-#     cursor.execute("SELECT * FROM users;")
-#     users = cursor.fetchall()
-#     connection.close()
-#     return users
-#   except Exception as err:
-#         return ({"err": str(err)}), 500
-
-     
-# # Route to sign-up a new user
-# @app.route('/auth/sign-up', methods=['POST'])
-# def sign_up():
-#     try:
-#         new_user_data = request.get_json()
-#         username = new_user_data.get("username")
-#         password = new_user_data.get("password")
-#         email = new_user_data.get("email")
-
-#         if not username or not password or not email:
-#             return ({"err": "Missing fields"}), 400
-#         connection = get_db_connection()
-#         cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-#         cursor.execute("SELECT * FROM users WHERE username = %s;", (username,))
-#         existing_user = cursor.fetchone()
-
-#         if existing_user:
-#             cursor.close()
-#             return ({"err": "Username already taken"}), 400
-#         hashed_password = bcrypt.hashpw(bytes(password, 'utf-8'), bcrypt.gensalt())
-#         cursor.execute("INSERT INTO users (username, password, email) VALUES (%s, %s, %s) RETURNING id, username",
-#                        (username, hashed_password.decode('utf-8'), email))
-#         created_user = cursor.fetchone()
-#         connection.commit()
-#         connection.close()
-#         payload = {"username": created_user["username"], "id": created_user["id"]}
-#         token = jwt.encode({"payload": payload}, os.getenv('JWT_SECRET'), algorithm="HS256")
-
-#         return ({"token": token}), 201
-#     except Exception as err:
-#         return ({"err": str(err)}), 500
-
-
-# # Route For User Sign-in 
-# @app.route('/signin', methods=['POST'])
-# def sign_in():
-#     try:
-#         user_credentials = request.json
-#         username = user_credentials.get('username')
-#         password = user_credentials.get('password')
-#         email =    user_credentials.get("email")
-
-        
-#         connection = get_db_connection()
-#         cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-#         cursor.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
-#         user = cursor.fetchone()
-#         connection.close()
-
-#         if user:
-#             return user  
-#         else:
-#             return "Invalid credentials", 401
-#     except Exception as e:
-#         return str(e), 500
-
-
-# #Route To Create New User 
-# @app.route('/users', methods=['POST'])
-# def create_user():
-#     try:
-#         new_user = request.json
-#         connection = get_db_connection()
-#         cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-#         cursor.execute("INSERT INTO users (username, password, email) VALUES (%s, %s, %s) RETURNING *",
-#                        (new_user['username'], new_user['password'], new_user['email']))
-#         created_user = cursor.fetchone()
-#         connection.commit()
-#         connection.close()
-#         return created_user, 201  
-#     except Exception as e:
-#         return str(e), 500
-
-
-# # Route To User ID
-# @app.route('/users/<user_id>', methods=['GET'])
-# def get_user(user_id):
-#    try:
-#       connection = get_db_connection()
-#       cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-#       cursor.execute("SELECT * FROM user WHERE id = %s", (user_id,))
-#       user = cursor.fetchone()
-#       connection.close()
-#       if user:
-#          return user
-#       else:
-#          return 404
-#     except Exception as e:
-#       return str(e), 500
-
 
 def get_db_connection():
     connection = psycopg2.connect(
         host='localhost',
         database='appointments_db',
-        user=os.environ['POSTGRES_USER'],
-        password=os.environ['POSTGRES_PASSWORD']
+        # user=os.environ['POSTGRES_USER'],
+        # password=os.environ['POSTGRES_PASSWORD']
     )
     return connection
 
@@ -148,33 +37,47 @@ def index():
     cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute("SELECT * FROM appointments;")
     appointments = cursor.fetchall()
+    for appointment in appointments:
+         if isinstance(appointment['time'], datetime.time):
+                appointment['time'] = appointment['time'].strftime('%H:%M:%S')
     connection.close()
     return appointments
-  except Exception as e: 
-    print(f"Error: {e}")
-    return "Application Error", 500
+  except:
+    return "Application Error", 500  #Index Works for postman
 
 
 # Create Route
-
-app.route('/appointments', methods=['POST'])
+@app.route('/appointments', methods=['POST'])
 def create_appointment():
-  try:
-    new_appointment = request.json
-    connection = get_db_connection()
-    cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cursor.execute("INSERT INTO appointment (style, date, time) VALUES (%s, %s, %s) RETURNING *",
-                   (new_appointment['style'], new_appointment['date'], new_appointment['time']))
-    created_appointment = cursor.fetchone()
-    connection.commit()
-    connection.close()
-    return created_appointment, 201
-  except Exception as e:
-     return str(e), 500
+    try:
+        new_appointment = request.json
+        
+        if not new_appointment.get('style') or not new_appointment.get('date') or not new_appointment.get('time'):
+            return {"error": "Missing required fields"}, 400
+        try:
+            appointment_date = new_appointment['date']
+            appointment_time = new_appointment['time']
+        except ValueError:
+            return {"error": "Invalid date or time format. Use 'YYYY-MM-DD' for date and 'HH:MM:SS' for time."}, 400
+        connection = get_db_connection()
+        cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor.execute("INSERT INTO appointments (style, date, time) VALUES (%s, %s, %s) RETURNING *",
+                       (new_appointment['style'], appointment_date, appointment_time))
+        
+        created_appointment = cursor.fetchone()
+        connection.commit()
+        connection.close()
+        if isinstance(created_appointment['time'], datetime.time):
+            created_appointment['time'] = created_appointment['time'].strftime('%H:%M:%S')
+        return created_appointment, 201
+
+    except psycopg2.DatabaseError as db_error:
+        return {"error": f"Database error: {str(db_error)}"}, 500
+    except Exception as e:
+        return {"error": f"An error occurred: {str(e)}"},   #This Works on postman
 
 
 # Show Route
-
 @app.route('/appointments/<appointment_id>', methods=['GET'])
 def show_appointment(appointment_id):
     try:
@@ -182,30 +85,54 @@ def show_appointment(appointment_id):
         cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cursor.execute("SELECT * FROM appointments WHERE id = %s", (appointment_id,))
         appointment = cursor.fetchone()
+        if appointment is not None:
+            if isinstance(appointment['time'], datetime.time):
+                appointment['time'] = appointment['time'].strftime('%H:%M:%S')
         if appointment is None:
             connection.close()
             return "Appointment Not Found", 404
         connection.close()
         return appointment, 200
+
     except Exception as e:
-        return str(e), 500
+        return str(e), 500    # This works for postman I believe 
+
 
 
 # Delete Route
 
 @app.route('/appointments/<appointment_id>', methods=['DELETE'])
 def delete_appointment(appointment_id):
+    connection = None
+    cursor = None
     try:
         connection = get_db_connection()
         cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Delete the appointment
         cursor.execute("DELETE FROM appointments WHERE id = %s", (appointment_id,))
+        
+        # Check if the appointment was deleted
         if cursor.rowcount == 0:
-            return "Appointment not found", 404
+            return {"error": "Appointment not found"}, 404
+        
+        # Commit the transaction
         connection.commit()
-        cursor.close()
-        return "Appointment deleted successfully", 204
+        
+        # Return a success message
+        return {"message": "Appointment deleted successfully"}, 200  # 200 or 202 is more appropriate here
+
+    except psycopg2.DatabaseError as db_error:
+        return {"error": f"Database error: {str(db_error)}"}, 500
     except Exception as e:
-        return str(e), 500
+        return {"error": f"An error occurred: {str(e)}"}, 500
+    finally:
+        # Ensure that the cursor and connection are always closed, even if an exception occurs
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
 
 # Update Route
 
@@ -223,7 +150,7 @@ def update_appointment(appointment_id):
       connection.close()
       return updated_appointment, 202
     except Exception as e:
-      return str(e), 500
+      return str(e), 500   
 
 
 app.run()
