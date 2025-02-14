@@ -95,7 +95,7 @@ def show_appointment(appointment_id):
         return appointment, 200
 
     except Exception as e:
-        return str(e), 500    # This works for postman I believe 
+        return str(e), 500    # This works for postman 
 
 
 
@@ -108,26 +108,16 @@ def delete_appointment(appointment_id):
     try:
         connection = get_db_connection()
         cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        
-        # Delete the appointment
         cursor.execute("DELETE FROM appointments WHERE id = %s", (appointment_id,))
-        
-        # Check if the appointment was deleted
         if cursor.rowcount == 0:
             return {"error": "Appointment not found"}, 404
-        
-        # Commit the transaction
         connection.commit()
-        
-        # Return a success message
         return {"message": "Appointment deleted successfully"}, 200  # 200 or 202 is more appropriate here
-
     except psycopg2.DatabaseError as db_error:
         return {"error": f"Database error: {str(db_error)}"}, 500
     except Exception as e:
         return {"error": f"An error occurred: {str(e)}"}, 500
     finally:
-        # Ensure that the cursor and connection are always closed, even if an exception occurs
         if cursor:
             cursor.close()
         if connection:
@@ -141,13 +131,18 @@ def update_appointment(appointment_id):
     try:
       appointment = request.json
       connection = get_db_connection()
+      
       cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
       cursor.execute("UPDATE appointments SET style = %s, date = %s, time = %s WHERE id = %s RETURNING *", (appointment['style'], appointment['date'], appointment['time'], appointment_id))
       updated_appointment = cursor.fetchone()
       if updated_appointment is None:
         return "Appointment Not Found", 404
+      if updated_appointment is not None:
+            if isinstance(updated_appointment['time'], datetime.time):
+                updated_appointment['time'] = updated_appointment['time'].strftime('%H:%M:%S')
       connection.commit()
       connection.close()
+     
       return updated_appointment, 202
     except Exception as e:
       return str(e), 500   
